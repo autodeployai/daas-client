@@ -1,0 +1,11 @@
+**/__pycache__/
+/.idea/
+/.project
+/build
+/dist
+**/.DS_Store
+**/*.pyc
+/MANIFEST
+**/.pytest_cache/
+**/.ipynb_checkpoints/
+**/spark-warehouse/
