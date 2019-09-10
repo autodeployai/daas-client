@@ -345,11 +345,13 @@ class DaasClient(object):
                 }
             }}
 
-    def deploy(self, model_name, deployment_name, model_version='latest', replicas=1):
+    def deploy(self, model_name, deployment_name, model_version='latest', cpu=None, memory=None, replicas=1):
         """Deploy a model in DaaS
         :param model_name: The specified model to deploy
         :param deployment_name: An unique name identifies the model deployment.
         :param model_version: The specified Model version to deploy, default 'latest'
+        :param cpu: float, how many cpu cores to assign this deployment runtime environment, default None
+        :param memory: float, how many memory(GB) assign this deployment runtime environment, default None
         :param replicas: int, how many replicas for this deployment, default 1
         :return: dict
             access_token:   Authorization access token to use in the next post request, e.g.
@@ -387,7 +389,9 @@ class DaasClient(object):
                                      'scriptPath': 'scoring-scripts/default_scoring.py',
                                      'runtime': runtime,
                                      'environment': {
-                                         'replicas': replicas
+                                         'replicas': replicas,
+                                         'cpu': cpu if cpu is not None and cpu > 0.0 else 0.0,
+                                         'memory': memory if memory is not None and memory > 0.0 else 0.0
                                      }
                                  })
         if not response.ok or response.json()['status'] == 'error':
