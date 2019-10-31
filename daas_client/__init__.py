@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+from __future__ import absolute_import, print_function
 from daas_client.daas_client import DaasClient, ApiException
 from daas_client.version import __version__
 
