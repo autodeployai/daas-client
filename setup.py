@@ -18,7 +18,7 @@ setup(
     packages=["daas_client"],
     # include_package_data=True,
     install_requires=[
-        "requests", "pandas", "pypmml"
+        "requests", "pandas", "pypmml", "onnx", "onnxruntime"
     ],
     url="https://github.com/autodeployai/daas-client",
     download_url="https://github.com/autodeployai/daas-client/archive/v" + VERSION + ".tar.gz",

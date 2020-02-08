@@ -165,7 +165,7 @@ class DaasClient(object):
                 model,
                 name,
                 mining_function=None,
-                X_test=None,
+                x_test=None,
                 y_test=None,
                 data_test=None,
                 description=None,
@@ -177,7 +177,7 @@ class DaasClient(object):
             version for such model name.
         :param mining_function: 'classification', 'regression', 'clustering'.
             Set the mining function of the model, could be inferred when not specified
-        :param X_test: {array-like, sparse matrix}, shape (n_samples, n_features)
+        :param x_test: {array-like, sparse matrix}, shape (n_samples, n_features)
             Perform prediction on samples in X_test, predicted labels or estimated target values returned by the model.
         :param y_test: 1d array-like, or label indicator array / sparse matrix.
             Ground truth (correct) target values.
@@ -192,7 +192,7 @@ class DaasClient(object):
         """
         metadata = get_model_metadata(model,
                                       mining_function=mining_function,
-                                      X_test=X_test,
+                                      x_test=x_test,
                                       y_test=y_test,
                                       data_test=data_test)
 

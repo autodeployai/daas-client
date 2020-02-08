@@ -9,9 +9,10 @@ It supports the following models by default, more types will be added in the lis
 * Scikit-learn
 * XGBoost
 * LightGBM
-* Keras (TensorFlow)
+* Keras and Tensorflow(tf.keras)
 * PySpark
 * PMML
+* ONNX
 * Custom models
 
 ## Prerequisites
@@ -21,6 +22,8 @@ It supports the following models by default, more types will be added in the lis
   - requests
   - pandas
   - pypmml
+  - onnx
+  - onnxruntime
   
 ## Installation
 
@@ -65,11 +68,11 @@ pip install --upgrade git+https://github.com/autodeployai/daas-client.git
     Train and publish a XGBoost model
     ```python
     X, y = iris_df[iris_feature_names], iris_df[iris_target_name]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
     model = XGBClassifier(max_depth=3, objective='multi:softprob')
-    model.fit(X_train, y_train)
+    model.fit(x_train, y_train)
 
-    publish_resp = client.publish(model, name='xgboost-cls', mining_function='classification', X_test=X_test, y_test=y_test, description='A XGBoost classification model')
+    publish_resp = client.publish(model, name='xgboost-cls', mining_function='classification', x_test=x_test, y_test=y_test, description='A XGBoost classification model')
     ```
     
     The result is a dict with published model name and version if success, e.g.
