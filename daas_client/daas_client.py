@@ -266,10 +266,11 @@ class DaasClient(object):
             result[x['name']] = x['sample'] if 'sample' in x else DaasClient.get_sample_value(x['type'])
         return result
 
-    def test(self, model_name, model_version='latest'):
+    def test(self, model_name, model_version='latest', runtime=None):
         """Get model test information in DaaS
         :param model_name: The specified model to test
         :param model_version: The specified model version to test, default 'latest'
+        :param runtime: The runtime to test the model, default 'None' that means to choose the default one
         :return: dict
             endpoint_url:    Endpoint url of model test to use.
             access_token:    Authorization access token to use in the next post request, e.g.
@@ -293,7 +294,8 @@ class DaasClient(object):
         model_info = response.json()
 
         # start the runtime
-        runtime = self.choose_runtime(model_info['version'])
+        if runtime is None:
+            runtime = self.choose_runtime(model_info['version'])
         url = '{url_prefix}/projects/{project}/runtimes/{runtime}/test-function-as-a-service'.format(
             url_prefix=self.url_prefix,
             project=self.project,
@@ -346,7 +348,7 @@ class DaasClient(object):
                 }
             }}
 
-    def deploy(self, model_name, deployment_name, model_version='latest', cpu=None, memory=None, replicas=1):
+    def deploy(self, model_name, deployment_name, model_version='latest', cpu=None, memory=None, replicas=1, runtime=None):
         """Deploy a model in DaaS
         :param model_name: The specified model to deploy
         :param deployment_name: An unique name identifies the model deployment.
@@ -354,6 +356,7 @@ class DaasClient(object):
         :param cpu: float, how many cpu cores to assign this deployment runtime environment, default None
         :param memory: float, how many memory(GB) assign this deployment runtime environment, default None
         :param replicas: int, how many replicas for this deployment, default 1
+        :param runtime: The runtime to deploy the model, default 'None' that means to choose the default one
         :return: dict
             access_token:   Authorization access token to use in the next post request, e.g.
                 Authorization: Bearer access_token
@@ -374,7 +377,8 @@ class DaasClient(object):
         model_info = response.json()
 
         # deploy a service
-        runtime = self.choose_runtime(model_info['version'])
+        if runtime is None:
+            runtime = self.choose_runtime(model_info['version'])
         url = '{url_prefix}/projects/{project}/services'.format(
             url_prefix=self.url_prefix,
             project=self.project)
