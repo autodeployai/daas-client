@@ -154,6 +154,20 @@ class DaasClient(object):
         else:
             raise ApiException(response)
 
+    def delete_project(self, name):
+        """Delete the specified project. NOTE: deletion will remove all assets.
+        :param name: The specified project to delete
+        :return: True if success, otherwise an exception raised.
+        """
+        url = '{url_prefix}/projects/{name}'.format(url_prefix=self.url_prefix, name=name)
+        response = requests.delete(url,
+                                   headers=self.headers,
+                                   verify=False)
+        if response.ok:
+            return True
+        else:
+            raise ApiException(response)
+
     def set_project(self, name):
         if not self.project_exists(name):
             raise ValueError('Project "{name}" not found'.format(name=name))
@@ -169,7 +183,8 @@ class DaasClient(object):
                 y_test=None,
                 data_test=None,
                 description=None,
-                params=None):
+                params=None,
+                source_object=None):
         """Publish the model to DaaS
         :param model: The model object
         :param name: The model name identifies the model in the project.
@@ -185,6 +200,8 @@ class DaasClient(object):
             Used by models of PySpark.
         :param description: Model description.
         :param params: An optional parameters to save.
+        :param source_object: An optional object's source code to save (class or function). Note: Class is not supported
+            in the Jupyter notebook, while you can use a function that returns an instance of your model class.
         :return: dict
             model_name       The model published
             model_version    The model version published
@@ -194,7 +211,8 @@ class DaasClient(object):
                                       mining_function=mining_function,
                                       x_test=x_test,
                                       y_test=y_test,
-                                      data_test=data_test)
+                                      data_test=data_test,
+                                      source_object=source_object)
 
         if params is not None:
             metadata['params'] = params

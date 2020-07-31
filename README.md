@@ -1,9 +1,9 @@
 # DaaS-Client
 
-_DaaS-Client_ is Python client library for DaaS
+_DaaS-Client_ is Python client library for DaaS(Deployment-as-a-Service)
 
 ## Features
-_DaaS-Client_ helps to publish your ML/AI models in Python, test and deploy them easily.
+_DaaS-Client_ helps to publish your AI/ML models in Python, test and deploy them easily.
 
 It supports the following models by default, more types will be added in the list.
 * Scikit-learn
@@ -13,6 +13,7 @@ It supports the following models by default, more types will be added in the lis
 * PySpark
 * PMML
 * ONNX
+* PyTorch
 * Custom models
 
 ## Prerequisites
@@ -20,6 +21,7 @@ It supports the following models by default, more types will be added in the lis
 
 ## Dependencies
   - requests
+  - numpy
   - pandas
   - pypmml
   - onnx

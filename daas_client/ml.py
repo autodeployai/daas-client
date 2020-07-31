@@ -27,7 +27,7 @@ FUNCTION_NAME_CLUSTERING = 'clustering'
 FUNCTION_NAME_UNKNOWN = 'unknown'
 
 SUPPORTED_FUNCTION_NAMES = (FUNCTION_NAME_CLASSIFICATION, FUNCTION_NAME_REGRESSION, FUNCTION_NAME_CLUSTERING)
-SUPPORTED_SERIALIZATIONS = ('pickle', 'joblib', 'spark', 'hdf5', 'xgboost', 'lightgbm', 'pmml', 'onnx')
+SUPPORTED_SERIALIZATIONS = ('pickle', 'joblib', 'spark', 'hdf5', 'xgboost', 'lightgbm', 'pmml', 'onnx', 'pt')
 
 
 class BaseModel(object):
@@ -80,7 +80,7 @@ class BaseModel(object):
         else:  # numpy array with multiple dimensions than two
             row = x_test[0]
             result.append({
-                'name': 'dense_input',
+                'name': 'tensor_input',
                 'sample': row.tolist(),
                 'type': x_test.dtype.name,
                 'shape': self._normalize_np_shape(x_test.shape)
@@ -110,7 +110,7 @@ class BaseModel(object):
         else:  # numpy array with multiple dimensions than two
             row = y_test[0]
             result.append({
-                'name': 'dense_target',
+                'name': 'tensor_target',
                 'sample': row.tolist(),
                 'type': y_test.dtype.name,
                 'shape': self._normalize_np_shape(y_test.shape)
@@ -118,7 +118,7 @@ class BaseModel(object):
 
         return result
 
-    def outputs(self, y_test, data_test):
+    def outputs(self, y_test, data_test, **kwargs):
         return []
 
     @staticmethod
@@ -158,7 +158,7 @@ class BaseModel(object):
     @staticmethod
     def _normalize_np_shape(shape):
         result = None
-        if len(shape) > 1:
+        if shape is not None and len(shape) > 1:
             result = []
             for idx, d in enumerate(shape):
                 if idx == 0:
@@ -370,7 +370,7 @@ class PMMLModel(BaseModel):
             }))
         return result
 
-    def outputs(self, y_test, data_test):
+    def outputs(self, y_test, data_test, **kwargs):
         result = []
         for x in self.pmml_model.outputFields:
             result.append(({
@@ -461,7 +461,8 @@ class ONNXModel(BaseModel):
 
             sess = self._get_inference_session()
             y_pred = None
-            if function_name in (FUNCTION_NAME_CLASSIFICATION, FUNCTION_NAME_REGRESSION) and len(sess.get_inputs()) == 1:
+            if function_name in (FUNCTION_NAME_CLASSIFICATION, FUNCTION_NAME_REGRESSION) and len(
+                    sess.get_inputs()) == 1:
                 input_name = sess.get_inputs()[0].name
                 y_pred = sess.run([sess.get_outputs()[0].name], {input_name: x_test.astype(np.float32)})[0]
                 y_pred = np.asarray(y_pred)
@@ -502,13 +503,13 @@ class ONNXModel(BaseModel):
         data = self._test_data_to_ndarray(x_test, data_test)
         if data is not None and len(result) == 1:
             if self._compatible_shape(data.shape, result[0]['shape']):
-                result[0]['sample'] = data[0].tolist()
+                result[0]['sample'] = [data[0].tolist()]
         return result
 
     def targets(self, y_test, data_test):
         return []
 
-    def outputs(self, y_test, data_test):
+    def outputs(self, y_test, data_test, **kwargs):
         result = []
 
         sess = self._get_inference_session()
@@ -758,7 +759,7 @@ class KerasModel(BaseModel):
             tensor_shape = self._normalize_tensor_shape(x.shape)
             result.append({
                 'name': name,
-                'sample': row.tolist() if row is not None and self._compatible_shape(tensor_shape, shape) else None,
+                'sample': [row.tolist()] if row is not None and self._compatible_shape(tensor_shape, shape) else None,
                 'type': np.dtype(x.dtype.as_numpy_dtype).name,
                 'shape': tensor_shape
             })
@@ -786,7 +787,7 @@ class KerasModel(BaseModel):
         else:
             row = y_test[0]
             result.append({
-                'name': 'dense_target',
+                'name': 'tensor_target',
                 'sample': row.tolist(),
                 'type': y_test.dtype.name,
                 'shape': self._normalize_np_shape(y_test.shape)
@@ -794,7 +795,7 @@ class KerasModel(BaseModel):
 
         return result
 
-    def outputs(self, y_test, data_test):
+    def outputs(self, y_test, data_test, **kwargs):
         result = []
 
         for idx, x in enumerate(self.model.outputs):
@@ -818,8 +819,8 @@ class KerasModel(BaseModel):
             function_name = input_function_name if input_function_name else self.mining_function(y_test)
 
             # convert to numpy array if not
-            x_test = x_test.values if isinstance(x_test, (pd.DataFrame, pd.Series)) else x_test
-            y_test = y_test.values if isinstance(x_test, (pd.DataFrame, pd.Series)) else y_test
+            x_test = BaseModel._to_ndarray(x_test)
+            y_test = BaseModel._to_ndarray(y_test)
 
             shape = y_test.shape
             if len(shape) > 1 and shape[1] > 1:
@@ -848,6 +849,143 @@ class KerasModel(BaseModel):
     @staticmethod
     def _normalize_tensor_shape(tensor_shape):
         return [d.value for d in tensor_shape]
+
+
+class PytorchModel(BaseModel):
+    def __init__(self, model):
+        BaseModel.__init__(self, model)
+
+    def is_support(self):
+        try:
+            from torch import nn
+            return isinstance(self.model, nn.Module)
+        except:
+            return False
+
+    def model_type(self):
+        return 'Pytorch'
+
+    def model_version(self):
+        import torch
+        return BaseModel.extract_major_minor_version(torch.__version__)
+
+    def mining_function(self, y_test):
+        return self._infer_mining_function(y_test)
+
+    def serialization(self):
+        return 'pt'
+
+    def predictors(self, x_test, data_test):
+        result = []
+
+        columns = None
+        shape = None
+        sample = None
+        if x_test is not None:
+            x_test = self._series_to_dataframe(x_test)
+            dtype = x_test.dtype
+            shape = x_test.shape
+            if isinstance(x_test, pd.DataFrame):
+                row = x_test.iloc[0]
+                columns = list(x_test.columns)
+            else:
+                row = x_test[0]
+            sample = [row.tolist()]
+        else:
+            import torch
+            dtype = torch.Tensor(1).numpy().dtype
+
+        result.append({
+            'name': 'tensor_input',
+            'sample': sample,
+            'type': dtype.name,
+            'shape': self._normalize_np_shape(shape)
+        })
+
+        if columns is not None and result[-1]['sample'] is not None:
+            result[-1]['columns'] = columns
+
+        return result
+
+    def targets(self, y_test, data_test):
+        if y_test is None:
+            return []
+
+        result = []
+        y_test = self._series_to_dataframe(y_test)
+        if isinstance(y_test, pd.DataFrame):
+            row = json.loads(y_test.iloc[0].to_json())
+        else:
+            row = y_test[0]
+
+        result.append({
+            'name': 'tensor_target',
+            'sample': row.tolist(),
+            'type': y_test.dtype.name,
+            'shape': self._normalize_np_shape(y_test.shape)
+        })
+
+        return result
+
+    def outputs(self, y_test, data_test, **kwargs):
+        result = []
+
+        if 'x_test' in kwargs:
+            x_test = self._to_ndarray(kwargs['x_test'])
+            if x_test is not None:
+                shape = list(x_test.shape)
+                if len(shape) > 0 and shape[0] > 1:
+                    shape[0] = 1
+
+                import torch
+                data = self.model(torch.randn(*shape)).data.numpy()
+                result.append(({
+                    'name': 'tensor_output',
+                    'type': data.dtype.name,
+                    'shape': self._normalize_np_shape(data.shape)
+                }))
+        return result
+
+    def evaluate_metrics(self, x_test, y_test, data_test, input_function_name):
+        if x_test is None or y_test is None:
+            return {}
+
+        try:
+            import numpy as np
+            import pandas as pd
+            import torch
+            function_name = input_function_name if input_function_name else self.mining_function(y_test)
+
+            # convert to numpy array if not
+            x_test = BaseModel._to_ndarray(x_test)
+            y_test = BaseModel._to_ndarray(y_test)
+
+            shape = y_test.shape
+            if len(shape) > 1 and shape[1] > 1:
+                y_test = np.argmax(y_test, axis=1)
+
+            if function_name == FUNCTION_NAME_CLASSIFICATION:
+                from sklearn.metrics import accuracy_score
+                dtype = torch.Tensor(1).dtype
+                data = self.model(torch.from_numpy(x_test).type(dtype)).data.numpy()
+                y_pred = pd.DataFrame(data).apply(lambda x: np.argmax(np.array([x])), axis=1)
+                accuracy = accuracy_score(y_test, y_pred)
+                return {
+                    'accuracy': accuracy
+                }
+            elif function_name == FUNCTION_NAME_REGRESSION:
+                from sklearn.metrics import explained_variance_score
+                dtype = torch.Tensor(1).dtype
+                data = self.model(torch.from_numpy(x_test).type(dtype)).data.numpy()
+                y_pred = pd.DataFrame(data)
+                explained_variance = explained_variance_score(y_test, y_pred)
+                return {
+                    'explainedVariance': explained_variance
+                }
+            else:
+                return {}
+        except:
+            return {}
 
 
 class SparkModel(BaseModel):
@@ -1004,9 +1142,12 @@ def get_model_metadata(model,
                        y_test=None,
                        data_test=None,
                        features_json=None,
-                       labels_json=None):
+                       labels_json=None,
+                       outputs_json=None,
+                       source_object=None):
     # The order of such list is significant, do not change it!
-    candidates = [LightGBMModel, XGBoostModel, SKLearnModel, SparkModel, KerasModel, PMMLModel, ONNXModel, CustomModel]
+    candidates = [LightGBMModel, XGBoostModel, SKLearnModel, SparkModel, KerasModel, PytorchModel,
+                  PMMLModel, ONNXModel, CustomModel]
 
     wrapped_model = None
     for cls in candidates:
@@ -1029,6 +1170,17 @@ def get_model_metadata(model,
     x_test = _ndarray_or_dataframe(x_test)
     y_test = _ndarray_or_dataframe(y_test)
 
+    # get the source code of an input object
+    object_name = None
+    object_source = None
+    if source_object is not None:
+        try:
+            import inspect
+            object_name = source_object.__name__
+            object_source = inspect.getsource(source_object)
+        except:
+            pass
+
     return {
         'runtime': wrapped_model.runtime(),
         'type': wrapped_model.model_type(),
@@ -1039,7 +1191,9 @@ def get_model_metadata(model,
         'metrics': wrapped_model.evaluate_metrics(x_test, y_test, data_test, mining_function),
         'predictors': features_json if features_json else wrapped_model.predictors(x_test, data_test),
         'targets': labels_json if labels_json else wrapped_model.targets(y_test, data_test),
-        'outputs': wrapped_model.outputs(y_test, data_test)
+        'outputs': outputs_json if outputs_json else wrapped_model.outputs(y_test, data_test, x_test=x_test),
+        'objectSource': object_source,
+        'objectName': object_name
     }
 
 
@@ -1067,6 +1221,9 @@ def save_model(model, model_path, serialization=None):
         model.save_model(model_path)
     elif serialization == 'hdf5':
         model.save(model_path)
+    elif serialization == 'pt':
+        import torch
+        torch.save(model.state_dict(), model_path)
     elif serialization == 'spark':
         from pyspark.ml import PipelineModel
         model.write().overwrite().save(model_path)
