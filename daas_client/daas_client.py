@@ -284,7 +284,7 @@ class DaasClient(object):
             result[x['name']] = x['sample'] if 'sample' in x else DaasClient.get_sample_value(x['type'])
         return result
 
-    def test(self, model_name, model_version='latest', runtime=None):
+    def test(self, model_name, model_version='latest', runtime=None, **args):
         """Get model test information in DaaS
         :param model_name: The specified model to test
         :param model_version: The specified model version to test, default 'latest'
@@ -328,21 +328,23 @@ class DaasClient(object):
         print('Waiting for it becomes available... \n')
 
         # get the runtime status
-        # wait for max 90 * 2 = 180 sec
         url = '{url_prefix}/projects/{project}/runtimes/{runtime}/status'.format(
             url_prefix=self.url_prefix,
             project=self.project,
             runtime=runtime)
         running = False
-        for x in range(90):
+
+        # wait for max timeout (default 180 seconds)
+        timeout = args['timeout'] if 'timeout' in args else 180
+        for x in range(timeout):
             response = requests.get(url, headers=self.headers, verify=False)
             if response.ok:
                 status = response.json()['status']
                 if status == 'Running':
                     running = True
                     break
-                if status == 'Pending' or status == 'Starting':
-                    time.sleep(2)
+                if status in ('Pending', 'Starting', 'Unknown'):
+                    time.sleep(1)
                 else:
                     raise RuntimeError('Runtime "{runtime}" is in {status}, try again later'.format(runtime=runtime,
                                                                                                     status=status))
@@ -366,7 +368,7 @@ class DaasClient(object):
                 }
             }}
 
-    def deploy(self, model_name, deployment_name, model_version='latest', cpu=None, memory=None, replicas=1, runtime=None):
+    def deploy(self, model_name, deployment_name, model_version='latest', cpu=None, memory=None, replicas=1, runtime=None, **args):
         """Deploy a model in DaaS
         :param model_name: The specified model to deploy
         :param deployment_name: An unique name identifies the model deployment.
@@ -423,13 +425,15 @@ class DaasClient(object):
         print('Waiting for it becomes available... \n')
 
         # get pods to check their status
-        # wait for max 90 * 2 = 180 sec
         url = '{url_prefix}/projects/{project}/services/{service}/pods'.format(
             url_prefix=self.url_prefix,
             project=self.project,
             service=deployment_name
         )
-        for x in range(90):
+
+        # wait for max timeout (default 180 seconds)
+        timeout = args['timeout'] if 'timeout' in args else 180
+        for x in range(timeout):
             response = requests.get(url, headers=self.headers, verify=False)
             if response.ok:
                 pods = response.json()
@@ -438,7 +442,7 @@ class DaasClient(object):
                 if DaasClient.__all_pods_failed(pods):
                     raise RuntimeError('All pods failed, try again later')
                 else:
-                    time.sleep(2)
+                    time.sleep(1)
 
         # get the service deployment
         url = '{url_prefix}/projects/{project}/services/{service}'.format(
@@ -472,6 +476,9 @@ class DaasClient(object):
 
     @staticmethod
     def __all_pods_failed(pods):
+        if not pods:
+            return False
+        
         for x in pods:
             if x['status'] in ('Running', 'Pending', 'Starting'):
                 return False
