@@ -184,7 +184,8 @@ class DaasClient(object):
                 data_test=None,
                 description=None,
                 params=None,
-                source_object=None):
+                source_object=None,
+                **args):
         """Publish the model to DaaS
         :param model: The model object
         :param name: The model name identifies the model in the project.
@@ -207,6 +208,8 @@ class DaasClient(object):
             model_version    The model version published
             message          An optional message
         """
+        if x_test is None and 'X_test' in args:
+            x_test = args['X_test']
         metadata = get_model_metadata(model,
                                       mining_function=mining_function,
                                       x_test=x_test,
