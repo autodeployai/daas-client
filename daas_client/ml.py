@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017-2019 AutoDeploy AI
+# Copyright (c) 2017-2021 AutoDeployAI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ class BaseModel(object):
         result = []
         if isinstance(x_test, np.ndarray) and x_test.ndim <= 2:
             x_test = pd.DataFrame(x_test)
-            x_test.columns = ['x'+str(i) for i in range(0, len(x_test.columns))]
+            x_test.columns = ['x' + str(i) for i in range(0, len(x_test.columns))]
 
         x_test = self._series_to_dataframe(x_test)
         if isinstance(x_test, pd.DataFrame):
@@ -95,7 +95,7 @@ class BaseModel(object):
         result = []
         if isinstance(y_test, np.ndarray) and y_test.ndim <= 2:
             y_test = pd.DataFrame(y_test)
-            y_test.columns = ['y'+str(i) for i in range(0, len(y_test.columns))]
+            y_test.columns = ['y' + str(i) for i in range(0, len(y_test.columns))]
 
         y_test = self._series_to_dataframe(y_test)
         if isinstance(y_test, pd.DataFrame):
@@ -141,7 +141,7 @@ class BaseModel(object):
                 y_pred = wrapped_model.model.predict(x_test)
                 accuracy = accuracy_score(y_test, y_pred)
                 return {
-                 'accuracy': accuracy
+                    'accuracy': accuracy
                 }
             elif function_name == FUNCTION_NAME_REGRESSION:
                 from sklearn.metrics import explained_variance_score
@@ -204,15 +204,22 @@ class BaseModel(object):
 
     @staticmethod
     def _compatible_shape(shape1, shape2):
-        if len(shape1) != len(shape2):
-            return False
-
         # could be tuple and list
         shape1 = list(shape1)
         shape2 = list(shape2)
         if len(shape1) > 1:
-            return shape1[1:] == shape2[1:]
-        return shape1 == shape2
+            shape1 = shape1[1:]
+        if len(shape2) > 1:
+            shape2 = shape2[1:]
+        return BaseModel._element_count(shape1) == BaseModel._element_count(shape2)
+
+    @staticmethod
+    def _element_count(shape):
+        result = 1
+        for n in shape:
+            if isinstance(n, int):
+                result *= n
+        return result
 
 
 class CustomModel(BaseModel):
@@ -681,7 +688,7 @@ class LightGBMModel(BaseModel):
             if function_name == FUNCTION_NAME_CLASSIFICATION:
                 from sklearn.metrics import accuracy_score
                 y_pred = pd.DataFrame(self.model.predict(x_test)).apply(lambda x: np.argmax(np.array([x])),
-                                                                                     axis=1)
+                                                                        axis=1)
                 accuracy = accuracy_score(y_test, y_pred)
                 return {
                     'accuracy': accuracy
@@ -712,7 +719,7 @@ class KerasModel(BaseModel):
             return self._is_support_tf_keras()
         except:
             return self._is_support_tf_keras()
-            
+
     def _is_support_tf_keras(self):
         try:
             import tensorflow as tf
@@ -829,7 +836,7 @@ class KerasModel(BaseModel):
             if function_name == FUNCTION_NAME_CLASSIFICATION:
                 from sklearn.metrics import accuracy_score
                 y_pred = pd.DataFrame(self.model.predict(x_test)).apply(lambda x: np.argmax(np.array([x])),
-                                                                                     axis=1)
+                                                                        axis=1)
                 accuracy = accuracy_score(y_test, y_pred)
                 return {
                     'accuracy': accuracy
@@ -848,7 +855,7 @@ class KerasModel(BaseModel):
 
     @staticmethod
     def _normalize_tensor_shape(tensor_shape):
-        return [d.value for d in tensor_shape]
+        return [(d.value if hasattr(d, 'value') else d) for d in tensor_shape]
 
 
 class PytorchModel(BaseModel):
@@ -1145,7 +1152,7 @@ def get_model_metadata(model,
                        labels_json=None,
                        outputs_json=None,
                        source_object=None):
-    # The order of such list is significant, do not change it!
+    # The order of such list is significant, do not change it!!!
     candidates = [LightGBMModel, XGBoostModel, SKLearnModel, SparkModel, KerasModel, PytorchModel,
                   PMMLModel, ONNXModel, CustomModel]
 
@@ -1220,7 +1227,11 @@ def save_model(model, model_path, serialization=None):
     elif serialization == 'xgboost':
         model.save_model(model_path)
     elif serialization == 'hdf5':
-        model.save(model_path)
+        import tensorflow
+        if tensorflow.__version__ >= '2':
+            model.save(model_path, save_format='h5')
+        else:
+            model.save(model_path)
     elif serialization == 'pt':
         import torch
         torch.save(model.state_dict(), model_path)
