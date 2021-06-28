@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017-2019 AutoDeploy AI
+# Copyright (c) 2017-2021 AutoDeployAI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -210,6 +210,7 @@ class DaasClient(object):
         """
         if x_test is None and 'X_test' in args:
             x_test = args['X_test']
+
         metadata = get_model_metadata(model,
                                       mining_function=mining_function,
                                       x_test=x_test,
@@ -258,15 +259,37 @@ class DaasClient(object):
 
         return result
 
-    @staticmethod
-    def choose_runtime(version_info):
-        result = 'daas-python37-faas'
+    def choose_runtime(self, version_info):
+        url = '{url_prefix}/projects/{project}/runtimes'.format(url_prefix=self.url_prefix, project=self.project)
+        response = requests.get(url,
+                                headers=self.headers,
+                                params={'type': 'environment'},
+                                verify=False)
+        if not response.ok:
+            raise ApiException(response=response)
+
+        runtimes = response.json()
         runtime = version_info['runtime']
         if runtime:
+            python2 = self.is_python_version(runtime, 2)
+            if python2:
+                for x in runtimes:
+                    if self.is_python_version(x, 2):
+                        return x
+            else:
+                for x in runtimes:
+                    if self.is_python_version(x, 3):
+                        return x
+        return runtimes[0] if len(runtimes) > 0 else None
+
+    @staticmethod
+    def is_python_version(runtime, version):
+        if runtime:
             runtime_to_test = runtime.lower().replace(' ', '-')
-            if runtime_to_test.find('python2') != -1 or runtime_to_test.find('python-2') != -1:
-                result = 'daas-python27-faas';
-        return result
+            if runtime_to_test.find('python{version}'.format(version=version)) != -1 or \
+                    runtime_to_test.find('python-{version}'.format(version=version)) != -1:
+                return True
+        return False
 
     @staticmethod
     def get_sample_value(typ):
@@ -481,7 +504,7 @@ class DaasClient(object):
     def __all_pods_failed(pods):
         if not pods:
             return False
-        
+
         for x in pods:
             if x['status'] in ('Running', 'Pending', 'Starting'):
                 return False
