@@ -274,13 +274,13 @@ class DaasClient(object):
             python2 = self.is_python_version(runtime, 2)
             if python2:
                 for x in runtimes:
-                    if self.is_python_version(x, 2):
-                        return x
+                    if self.is_python_version(x.get('feature'), 2):
+                        return x['name']
             else:
                 for x in runtimes:
-                    if self.is_python_version(x, 3):
-                        return x
-        return runtimes[0] if len(runtimes) > 0 else None
+                    if self.is_python_version(x.get('feature'), 3):
+                        return x['name']
+        return runtimes[0]['name'] if len(runtimes) > 0 else None
 
     @staticmethod
     def is_python_version(runtime, version):
