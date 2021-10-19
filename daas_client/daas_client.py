@@ -30,7 +30,7 @@ requests.packages.urllib3.disable_warnings()
 class ApiException(Exception):
     """Class for API Exceptions"""
 
-    def __init__(self, code=None, reason=None, response=None):
+    def __init__(self, response=None, code=None, reason=None):
         if response is not None:
             self.code = response.status_code
             try:
